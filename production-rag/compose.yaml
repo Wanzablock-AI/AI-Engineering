@@ -1,0 +1,18 @@
+services:
+  production-rag:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: production-rag:dev
+    container_name: production-rag
+    ports:
+      - "8000:8000"
+    environment:
+      RAG_DB_PATH: /app/data/production-rag.db
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      OLLAMA_MODEL: granite4.1:3b
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
