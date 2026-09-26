@@ -186,3 +186,126 @@ def test_ingest_replaces_existing_document(tmp_path):
         result.document == "security.pdf"
         for result in replacement_results
     )
+
+
+def test_ingest_rejects_pdf_without_text_before_replacing_existing_document(
+    tmp_path,
+):
+    pdf_path = tmp_path / "security.pdf"
+    db_path = tmp_path / "test.db"
+
+    document = pymupdf.open()
+    page = document.new_page()
+    page.insert_text((72, 72), "Existing indexed document.")
+    document.save(pdf_path)
+    document.close()
+
+    chunk_store = ChunkStore(db_path)
+    embedding_provider = DeterministicEmbeddingProvider(dimensions=8)
+    vector_store = VectorStore(
+        db_path,
+        dimensions=embedding_provider.dimensions,
+    )
+    lexical_retriever = LexicalRetriever(db_path)
+
+    ingestor = DocumentIngestor(
+        chunk_store=chunk_store,
+        vector_store=vector_store,
+        embedding_provider=embedding_provider,
+        lexical_retriever=lexical_retriever,
+    )
+
+    ingestor.ingest(pdf_path)
+
+    document = pymupdf.open()
+    document.new_page()
+    document.save(pdf_path)
+    document.close()
+
+    import pytest
+
+    with pytest.raises(ValueError, match="No text chunks"):
+        ingestor.ingest(pdf_path)
+
+    assert chunk_store.count() == 1
+    assert vector_store.count() == 1
+    assert lexical_retriever.search("Existing") != []
+
+
+class FailingEmbeddingProvider:
+    dimensions = 8
+
+    def __init__(self):
+        self.calls = 0
+
+    def embed(self, text):
+        self.calls += 1
+
+        if self.calls == 2:
+            raise RuntimeError("embedding failed")
+
+        return [0.1] * self.dimensions
+
+
+def test_ingest_preserves_existing_document_when_embedding_fails(
+    tmp_path,
+):
+    pdf_path = tmp_path / "security.pdf"
+    db_path = tmp_path / "test.db"
+
+    document = pymupdf.open()
+    page = document.new_page()
+    page.insert_text((72, 72), "Original indexed document.")
+    document.save(pdf_path)
+    document.close()
+
+    chunk_store = ChunkStore(db_path)
+    initial_provider = DeterministicEmbeddingProvider(dimensions=8)
+    vector_store = VectorStore(
+        db_path,
+        dimensions=initial_provider.dimensions,
+    )
+    lexical_retriever = LexicalRetriever(db_path)
+
+    initial_ingestor = DocumentIngestor(
+        chunk_store=chunk_store,
+        vector_store=vector_store,
+        embedding_provider=initial_provider,
+        lexical_retriever=lexical_retriever,
+    )
+
+    initial_ingestor.ingest(pdf_path)
+
+    document = pymupdf.open()
+
+    page = document.new_page()
+    page.insert_text((72, 72), "Replacement page one.")
+
+    page = document.new_page()
+    page.insert_text((72, 72), "Replacement page two.")
+
+    document.save(pdf_path)
+    document.close()
+
+    failing_ingestor = DocumentIngestor(
+        chunk_store=chunk_store,
+        vector_store=vector_store,
+        embedding_provider=FailingEmbeddingProvider(),
+        lexical_retriever=lexical_retriever,
+    )
+
+    import pytest
+
+    with pytest.raises(RuntimeError, match="embedding failed"):
+        failing_ingestor.ingest(pdf_path)
+
+    assert chunk_store.count() == 1
+    assert vector_store.count() == 1
+
+    original = chunk_store.get_chunk("security.pdf:1:0")
+
+    assert original is not None
+    assert "Original indexed document" in original.text
+
+    assert lexical_retriever.search("Original") != []
+    assert lexical_retriever.search("Replacement") == []

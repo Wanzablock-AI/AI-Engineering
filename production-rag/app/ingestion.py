@@ -47,6 +47,19 @@ class DocumentIngestor:
             overlap=self.overlap,
         )
 
+        if not chunks:
+            raise ValueError(
+                f"No text chunks found in PDF: {path.name}"
+            )
+
+        embeddings = [
+            (
+                chunk.chunk_id,
+                self.embedding_provider.embed(chunk.text),
+            )
+            for chunk in chunks
+        ]
+
         self.chunk_store.delete_document(path.name)
         self.vector_store.delete_document(path.name)
 
@@ -58,11 +71,9 @@ class DocumentIngestor:
         if self.lexical_retriever is not None:
             self.lexical_retriever.add_chunks(chunks)
 
-        for chunk in chunks:
-            vector = self.embedding_provider.embed(chunk.text)
-
+        for chunk_id, vector in embeddings:
             self.vector_store.add_embedding(
-                chunk.chunk_id,
+                chunk_id,
                 vector,
             )
 
