@@ -130,3 +130,83 @@ def test_lexical_retriever_deletes_document(tmp_path):
 
     assert len(results) == 1
     assert results[0].document == "other.pdf"
+
+def test_lexical_retriever_replaces_existing_chunk_without_duplicates(tmp_path):
+    db_path = tmp_path / "test.db"
+
+    store = ChunkStore(db_path)
+
+    original = Chunk(
+        chunk_id="security.pdf:1:0",
+        document="security.pdf",
+        page_number=1,
+        text="Original security content.",
+    )
+
+    replacement = Chunk(
+        chunk_id="security.pdf:1:0",
+        document="security.pdf",
+        page_number=1,
+        text="Replacement security content.",
+    )
+
+    store.add_chunks([original])
+
+    retriever = LexicalRetriever(db_path)
+
+    retriever.add_chunks([replacement])
+
+    assert retriever.search("Original") == []
+
+    results = retriever.search("Replacement")
+
+    assert len(results) == 1
+    assert results[0].chunk_id == "security.pdf:1:0"
+
+
+def test_lexical_retriever_rebuilds_stale_index_from_chunk_store(tmp_path):
+    db_path = tmp_path / "test.db"
+
+    store = ChunkStore(db_path)
+
+    store.add_chunks(
+        [
+            Chunk(
+                chunk_id="security.pdf:1:0",
+                document="security.pdf",
+                page_number=1,
+                text="Current security content.",
+            )
+        ]
+    )
+
+    retriever = LexicalRetriever(db_path)
+
+    with retriever._connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO chunks_fts (
+                chunk_id,
+                document,
+                page_number,
+                text
+            )
+            VALUES (?, ?, ?, ?)
+            """,
+            (
+                "stale.pdf:1:0",
+                "stale.pdf",
+                1,
+                "Stale content that no longer exists.",
+            ),
+        )
+        connection.commit()
+
+    retriever = LexicalRetriever(db_path)
+
+    assert retriever.search("Stale") == []
+
+    results = retriever.search("Current")
+
+    assert len(results) == 1
+    assert results[0].chunk_id == "security.pdf:1:0"

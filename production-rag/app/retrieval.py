@@ -46,6 +46,10 @@ class LexicalRetriever:
             )
 
             connection.execute(
+                "DELETE FROM chunks_fts"
+            )
+
+            connection.execute(
                 """
                 INSERT INTO chunks_fts (
                     chunk_id,
@@ -54,16 +58,11 @@ class LexicalRetriever:
                     text
                 )
                 SELECT
-                    c.chunk_id,
-                    c.document,
-                    c.page_number,
-                    c.text
-                FROM chunks AS c
-                WHERE NOT EXISTS (
-                    SELECT 1
-                    FROM chunks_fts AS f
-                    WHERE f.chunk_id = c.chunk_id
-                )
+                    chunk_id,
+                    document,
+                    page_number,
+                    text
+                FROM chunks
                 """
             )
 
@@ -85,7 +84,18 @@ class LexicalRetriever:
         with self._connect() as connection:
             connection.executemany(
                 """
-                INSERT OR REPLACE INTO chunks_fts (
+                DELETE FROM chunks_fts
+                WHERE chunk_id = ?
+                """,
+                [
+                    (chunk.chunk_id,)
+                    for chunk in chunks
+                ],
+            )
+
+            connection.executemany(
+                """
+                INSERT INTO chunks_fts (
                     chunk_id,
                     document,
                     page_number,
