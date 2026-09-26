@@ -121,3 +121,61 @@ def test_hybrid_search_rejects_invalid_rrf_k(tmp_path):
             chunk_store=chunk_store,
             rrf_k=0,
         )
+
+
+def test_hybrid_search_does_not_let_stale_candidate_consume_limit(tmp_path):
+    db_path = tmp_path / "hybrid.db"
+
+    chunk_store = ChunkStore(db_path)
+
+    chunks = [
+        Chunk(
+            chunk_id="doc:1:0",
+            document="doc.pdf",
+            page_number=1,
+            text="alpha security",
+        ),
+        Chunk(
+            chunk_id="doc:1:1",
+            document="doc.pdf",
+            page_number=1,
+            text="beta security",
+        ),
+    ]
+
+    chunk_store.add_chunks(chunks)
+
+    lexical = LexicalRetriever(db_path)
+
+    provider = DeterministicEmbeddingProvider(dimensions=8)
+
+    vector_store = VectorStore(
+        db_path,
+        dimensions=provider.dimensions,
+    )
+
+    for chunk in chunks:
+        vector_store.add_embedding(
+            chunk.chunk_id,
+            provider.embed(chunk.text),
+        )
+
+    vector_store.add_embedding(
+        "stale:1:0",
+        provider.embed("security"),
+    )
+
+    hybrid = HybridRetriever(
+        lexical_retriever=lexical,
+        vector_store=vector_store,
+        embedding_provider=provider,
+        chunk_store=chunk_store,
+    )
+
+    results = hybrid.search("security", limit=2)
+
+    assert len(results) == 2
+    assert {result.chunk_id for result in results} == {
+        "doc:1:0",
+        "doc:1:1",
+    }

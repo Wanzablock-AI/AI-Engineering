@@ -76,7 +76,7 @@ class HybridRetriever:
 
         results: list[HybridSearchResult] = []
 
-        for chunk_id in ranked_ids[:limit]:
+        for chunk_id in ranked_ids:
             chunk = self.chunk_store.get_chunk(chunk_id)
 
             if chunk is None:
@@ -91,5 +91,8 @@ class HybridRetriever:
                     score=scores[chunk_id],
                 )
             )
+
+            if len(results) >= limit:
+                break
 
         return results
