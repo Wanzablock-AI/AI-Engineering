@@ -1,9 +1,17 @@
-from fastapi import FastAPI
+import shutil
+import tempfile
+from pathlib import Path
+
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field, field_validator
 
+from app.embeddings import SentenceTransformerEmbeddingProvider
 from app.generation import GroundedAnswer
 from app.graph import RAGGraph
+from app.ingestion import DocumentIngestor, IngestionResult
 from app.rag_service import build_rag_graph
+from app.storage import ChunkStore, DEFAULT_DB_PATH
+from app.vector_store import VectorStore
 
 
 class QueryRequest(BaseModel):
@@ -28,13 +36,24 @@ class QueryResponse(BaseModel):
     citations: list[CitationResponse]
 
 
-def create_app(graph: RAGGraph | None = None) -> FastAPI:
+class IngestionResponse(BaseModel):
+    document: str
+    pages: int
+    chunks: int
+    embeddings: int
+
+
+def create_app(
+    graph: RAGGraph | None = None,
+    ingestor: DocumentIngestor | None = None,
+) -> FastAPI:
     app = FastAPI(
         title="Production RAG API",
         version="0.1.0",
     )
 
     rag_graph = graph
+    document_ingestor = ingestor
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -58,6 +77,55 @@ def create_app(graph: RAGGraph | None = None) -> FastAPI:
                 )
                 for citation in result.citations
             ],
+        )
+
+    @app.post("/ingest", response_model=IngestionResponse)
+    def ingest(file: UploadFile = File(...)) -> IngestionResponse:
+        nonlocal document_ingestor
+
+        if not file.filename:
+            raise HTTPException(
+                status_code=400,
+                detail="A PDF filename is required",
+            )
+
+        if Path(file.filename).suffix.lower() != ".pdf":
+            raise HTTPException(
+                status_code=400,
+                detail="Only PDF files are supported",
+            )
+
+        if document_ingestor is None:
+            embedding_provider = SentenceTransformerEmbeddingProvider()
+
+            vector_store = VectorStore(
+                DEFAULT_DB_PATH,
+                dimensions=embedding_provider.dimensions,
+            )
+
+            document_ingestor = DocumentIngestor(
+                chunk_store=ChunkStore(DEFAULT_DB_PATH),
+                vector_store=vector_store,
+                embedding_provider=embedding_provider,
+            )
+
+        safe_filename = Path(file.filename).name
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            temporary_path = Path(temporary_directory) / safe_filename
+
+            with temporary_path.open("wb") as temporary_file:
+                shutil.copyfileobj(file.file, temporary_file)
+
+            result: IngestionResult = document_ingestor.ingest(
+                temporary_path
+            )
+
+        return IngestionResponse(
+            document=result.document,
+            pages=result.pages,
+            chunks=result.chunks,
+            embeddings=result.embeddings,
         )
 
     return app

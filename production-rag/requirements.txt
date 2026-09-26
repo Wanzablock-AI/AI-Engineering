@@ -6,3 +6,5 @@ pytest
 sentence-transformers
 langgraph
 httpx
+
+python-multipart
