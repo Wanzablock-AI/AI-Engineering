@@ -72,3 +72,19 @@ def test_chunk_store_deletes_document(tmp_path):
     assert store.get_chunk("security.pdf:1:0") is None
     assert store.get_chunk("security.pdf:2:0") is None
     assert store.get_chunk("other.pdf:1:0") is not None
+
+
+def test_default_db_path_reads_environment(monkeypatch):
+    monkeypatch.setenv(
+        "RAG_DB_PATH",
+        "/tmp/production-rag-test.db",
+    )
+
+    import importlib
+    import app.storage
+
+    storage = importlib.reload(app.storage)
+
+    assert storage.DEFAULT_DB_PATH == storage.Path(
+        "/tmp/production-rag-test.db"
+    )

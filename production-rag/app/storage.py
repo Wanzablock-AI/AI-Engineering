@@ -1,10 +1,13 @@
+import os
 import sqlite3
 from pathlib import Path
 
 from app.chunking import Chunk
 
 
-DEFAULT_DB_PATH = Path("data/production-rag.db")
+DEFAULT_DB_PATH = Path(
+    os.getenv("RAG_DB_PATH", "data/production-rag.db")
+)
 
 
 class ChunkStore:
