@@ -49,6 +49,7 @@ class VectorStore:
         self,
         chunk_id: str,
         vector: list[float],
+        connection: sqlite3.Connection | None = None,
     ) -> None:
         if not chunk_id.strip():
             raise ValueError("chunk_id cannot be empty")
@@ -63,7 +64,7 @@ class VectorStore:
                 "vector values must be finite"
             )
 
-        with self._connect() as connection:
+        if connection is not None:
             connection.execute(
                 """
                 INSERT OR REPLACE INTO embeddings (
@@ -77,10 +78,21 @@ class VectorStore:
                     json.dumps(vector),
                 ),
             )
+            return
 
+        with self._connect() as connection:
+            self.add_embedding(
+                chunk_id,
+                vector,
+                connection=connection,
+            )
             connection.commit()
 
-    def delete_document(self, document: str) -> None:
+    def delete_document(
+        self,
+        document: str,
+        connection: sqlite3.Connection | None = None,
+    ) -> None:
         if not document.strip():
             raise ValueError("document cannot be empty")
 
@@ -92,7 +104,7 @@ class VectorStore:
         )
         prefix = f"{escaped_document}:%"
 
-        with self._connect() as connection:
+        if connection is not None:
             connection.execute(
                 """
                 DELETE FROM embeddings
@@ -100,7 +112,13 @@ class VectorStore:
                 """,
                 (prefix,),
             )
+            return
 
+        with self._connect() as connection:
+            self.delete_document(
+                document,
+                connection=connection,
+            )
             connection.commit()
 
     def get_embedding(

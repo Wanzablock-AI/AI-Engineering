@@ -77,11 +77,15 @@ class LexicalRetriever:
             for term in terms
         )
 
-    def add_chunks(self, chunks: list[Chunk]) -> None:
+    def add_chunks(
+        self,
+        chunks: list[Chunk],
+        connection: sqlite3.Connection | None = None,
+    ) -> None:
         if not chunks:
             return
 
-        with self._connect() as connection:
+        if connection is not None:
             connection.executemany(
                 """
                 DELETE FROM chunks_fts
@@ -113,14 +117,24 @@ class LexicalRetriever:
                     for chunk in chunks
                 ],
             )
+            return
 
+        with self._connect() as connection:
+            self.add_chunks(
+                chunks,
+                connection=connection,
+            )
             connection.commit()
 
-    def delete_document(self, document: str) -> None:
+    def delete_document(
+        self,
+        document: str,
+        connection: sqlite3.Connection | None = None,
+    ) -> None:
         if not document.strip():
             raise ValueError("document cannot be empty")
 
-        with self._connect() as connection:
+        if connection is not None:
             connection.execute(
                 """
                 DELETE FROM chunks_fts
@@ -128,7 +142,13 @@ class LexicalRetriever:
                 """,
                 (document,),
             )
+            return
 
+        with self._connect() as connection:
+            self.delete_document(
+                document,
+                connection=connection,
+            )
             connection.commit()
 
     def search(

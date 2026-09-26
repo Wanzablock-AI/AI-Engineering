@@ -26,6 +26,115 @@ def create_test_pdf(path):
     document.close()
 
 
+class FailingVectorStore(VectorStore):
+    def __init__(self, db_path, dimensions):
+        super().__init__(db_path, dimensions)
+        self.calls = 0
+        self.fail = False
+
+    def add_embedding(
+        self,
+        chunk_id,
+        vector,
+        connection=None,
+    ):
+        self.calls += 1
+
+        if self.fail and self.calls == 2:
+            raise RuntimeError("vector write failed")
+
+        return super().add_embedding(
+            chunk_id,
+            vector,
+            connection=connection,
+        )
+
+
+def test_ingest_rolls_back_all_stores_when_vector_write_fails(tmp_path):
+    pdf_path = tmp_path / "security.pdf"
+    db_path = tmp_path / "test.db"
+
+    create_test_pdf(pdf_path)
+
+    chunk_store = ChunkStore(db_path)
+    embedding_provider = DeterministicEmbeddingProvider(dimensions=8)
+    vector_store = FailingVectorStore(
+        db_path,
+        dimensions=embedding_provider.dimensions,
+    )
+    lexical_retriever = LexicalRetriever(db_path)
+
+    ingestor = DocumentIngestor(
+        chunk_store=chunk_store,
+        vector_store=vector_store,
+        embedding_provider=embedding_provider,
+        lexical_retriever=lexical_retriever,
+    )
+
+    ingestor.ingest(pdf_path)
+
+    original_chunk = chunk_store.get_chunk(
+        "security.pdf:1:0"
+    )
+    original_embedding = vector_store.get_embedding(
+        "security.pdf:1:0"
+    )
+
+    assert original_chunk is not None
+    assert original_embedding is not None
+    assert "Input validation" in original_chunk.text
+    assert len(lexical_retriever.search("Input validation")) == 1
+
+    document = pymupdf.open()
+
+    page = document.new_page()
+    page.insert_text(
+        (72, 72),
+        "Replacement content page one.",
+    )
+
+    page = document.new_page()
+    page.insert_text(
+        (72, 72),
+        "Replacement content page two.",
+    )
+
+    document.save(pdf_path)
+    document.close()
+
+    vector_store.calls = 0
+    vector_store.fail = True
+
+    try:
+        ingestor.ingest(pdf_path)
+    except RuntimeError as exc:
+        assert str(exc) == "vector write failed"
+    else:
+        raise AssertionError("Expected vector write failure")
+
+    assert chunk_store.count() == 2
+    assert vector_store.count() == 2
+
+    restored_chunk = chunk_store.get_chunk(
+        "security.pdf:1:0"
+    )
+    restored_embedding = vector_store.get_embedding(
+        "security.pdf:1:0"
+    )
+
+    assert restored_chunk is not None
+    assert "Input validation" in restored_chunk.text
+    assert restored_embedding == original_embedding
+
+    assert chunk_store.get_chunk("security.pdf:2:0") is not None
+    assert vector_store.get_embedding("security.pdf:2:0") is not None
+
+    assert lexical_retriever.search("Input validation")
+    assert lexical_retriever.search("Authentication")
+
+    assert lexical_retriever.search("Replacement") == []
+
+
 def test_ingest_persists_chunks_and_embeddings(tmp_path):
     pdf_path = tmp_path / "security.pdf"
     db_path = tmp_path / "test.db"

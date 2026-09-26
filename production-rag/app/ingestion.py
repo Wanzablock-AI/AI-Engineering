@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
+import sqlite3
 
 from app.chunking import Chunk, chunk_pages
 from app.embeddings import EmbeddingProvider
@@ -60,22 +61,40 @@ class DocumentIngestor:
             for chunk in chunks
         ]
 
-        self.chunk_store.delete_document(path.name)
-        self.vector_store.delete_document(path.name)
-
-        if self.lexical_retriever is not None:
-            self.lexical_retriever.delete_document(path.name)
-
-        self.chunk_store.add_chunks(chunks)
-
-        if self.lexical_retriever is not None:
-            self.lexical_retriever.add_chunks(chunks)
-
-        for chunk_id, vector in embeddings:
-            self.vector_store.add_embedding(
-                chunk_id,
-                vector,
+        with sqlite3.connect(self.chunk_store.db_path) as connection:
+            self.chunk_store.delete_document(
+                path.name,
+                connection=connection,
             )
+
+            self.vector_store.delete_document(
+                path.name,
+                connection=connection,
+            )
+
+            if self.lexical_retriever is not None:
+                self.lexical_retriever.delete_document(
+                    path.name,
+                    connection=connection,
+                )
+
+            self.chunk_store.add_chunks(
+                chunks,
+                connection=connection,
+            )
+
+            if self.lexical_retriever is not None:
+                self.lexical_retriever.add_chunks(
+                    chunks,
+                    connection=connection,
+                )
+
+            for chunk_id, vector in embeddings:
+                self.vector_store.add_embedding(
+                    chunk_id,
+                    vector,
+                    connection=connection,
+                )
 
         return IngestionResult(
             document=path.name,

@@ -41,8 +41,12 @@ class ChunkStore:
 
             connection.commit()
 
-    def add_chunks(self, chunks: list[Chunk]) -> None:
-        with self._connect() as connection:
+    def add_chunks(
+        self,
+        chunks: list[Chunk],
+        connection: sqlite3.Connection | None = None,
+    ) -> None:
+        if connection is not None:
             connection.executemany(
                 """
                 INSERT OR REPLACE INTO chunks (
@@ -63,14 +67,21 @@ class ChunkStore:
                     for chunk in chunks
                 ],
             )
+            return
 
+        with self._connect() as connection:
+            self.add_chunks(chunks, connection=connection)
             connection.commit()
 
-    def delete_document(self, document: str) -> None:
+    def delete_document(
+        self,
+        document: str,
+        connection: sqlite3.Connection | None = None,
+    ) -> None:
         if not document.strip():
             raise ValueError("document cannot be empty")
 
-        with self._connect() as connection:
+        if connection is not None:
             connection.execute(
                 """
                 DELETE FROM chunks
@@ -78,7 +89,13 @@ class ChunkStore:
                 """,
                 (document,),
             )
+            return
 
+        with self._connect() as connection:
+            self.delete_document(
+                document,
+                connection=connection,
+            )
             connection.commit()
 
     def get_chunk(self, chunk_id: str) -> Chunk | None:
