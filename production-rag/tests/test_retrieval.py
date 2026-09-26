@@ -92,3 +92,41 @@ def test_lexical_retrieval_handles_natural_language_punctuation(tmp_path):
 
     assert len(results) == 1
     assert results[0].chunk_id == "security.pdf:1:0"
+
+
+
+
+def test_lexical_retriever_deletes_document(tmp_path):
+    db_path = tmp_path / "test.db"
+
+    store = ChunkStore(db_path)
+
+    store.add_chunks(
+        [
+            Chunk(
+                chunk_id="security.pdf:1:0",
+                document="security.pdf",
+                page_number=1,
+                text="Zebracode security content.",
+            ),
+            Chunk(
+                chunk_id="other.pdf:1:0",
+                document="other.pdf",
+                page_number=1,
+                text="Other document content.",
+            ),
+        ]
+    )
+
+    retriever = LexicalRetriever(db_path)
+
+    assert len(retriever.search("Zebracode")) == 1
+
+    retriever.delete_document("security.pdf")
+
+    assert retriever.search("Zebracode") == []
+
+    results = retriever.search("other")
+
+    assert len(results) == 1
+    assert results[0].document == "other.pdf"

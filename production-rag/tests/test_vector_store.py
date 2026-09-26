@@ -158,3 +158,18 @@ def test_vector_store_search_rejects_invalid_limit(tmp_path):
         pass
     else:
         raise AssertionError("Expected ValueError")
+
+
+def test_vector_store_deletes_document(tmp_path):
+    store = VectorStore(tmp_path / "test.db", dimensions=2)
+
+    store.add_embedding("security.pdf:1:0", [1.0, 0.0])
+    store.add_embedding("security.pdf:2:0", [0.0, 1.0])
+    store.add_embedding("other.pdf:1:0", [0.5, 0.5])
+
+    store.delete_document("security.pdf")
+
+    assert store.count() == 1
+    assert store.get_embedding("security.pdf:1:0") is None
+    assert store.get_embedding("security.pdf:2:0") is None
+    assert store.get_embedding("other.pdf:1:0") == [0.5, 0.5]

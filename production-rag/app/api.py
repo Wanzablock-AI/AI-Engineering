@@ -10,6 +10,7 @@ from app.generation import GroundedAnswer
 from app.graph import RAGGraph
 from app.ingestion import DocumentIngestor, IngestionResult
 from app.rag_service import build_rag_graph
+from app.retrieval import LexicalRetriever
 from app.storage import ChunkStore, DEFAULT_DB_PATH
 from app.vector_store import VectorStore
 
@@ -103,10 +104,13 @@ def create_app(
                 dimensions=embedding_provider.dimensions,
             )
 
+            lexical_retriever = LexicalRetriever(DEFAULT_DB_PATH)
+
             document_ingestor = DocumentIngestor(
                 chunk_store=ChunkStore(DEFAULT_DB_PATH),
                 vector_store=vector_store,
                 embedding_provider=embedding_provider,
+                lexical_retriever=lexical_retriever,
             )
 
         safe_filename = Path(file.filename).name

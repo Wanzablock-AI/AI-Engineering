@@ -66,6 +66,21 @@ class ChunkStore:
 
             connection.commit()
 
+    def delete_document(self, document: str) -> None:
+        if not document.strip():
+            raise ValueError("document cannot be empty")
+
+        with self._connect() as connection:
+            connection.execute(
+                """
+                DELETE FROM chunks
+                WHERE document = ?
+                """,
+                (document,),
+            )
+
+            connection.commit()
+
     def get_chunk(self, chunk_id: str) -> Chunk | None:
         with self._connect() as connection:
             row = connection.execute(

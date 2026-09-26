@@ -38,3 +38,37 @@ def test_chunk_store_returns_none_for_missing_chunk(tmp_path):
     store = ChunkStore(tmp_path / "test.db")
 
     assert store.get_chunk("missing") is None
+
+
+def test_chunk_store_deletes_document(tmp_path):
+    store = ChunkStore(tmp_path / "test.db")
+
+    store.add_chunks(
+        [
+            Chunk(
+                chunk_id="security.pdf:1:0",
+                document="security.pdf",
+                page_number=1,
+                text="Old first chunk.",
+            ),
+            Chunk(
+                chunk_id="security.pdf:2:0",
+                document="security.pdf",
+                page_number=2,
+                text="Old second chunk.",
+            ),
+            Chunk(
+                chunk_id="other.pdf:1:0",
+                document="other.pdf",
+                page_number=1,
+                text="Other document.",
+            ),
+        ]
+    )
+
+    store.delete_document("security.pdf")
+
+    assert store.count() == 1
+    assert store.get_chunk("security.pdf:1:0") is None
+    assert store.get_chunk("security.pdf:2:0") is None
+    assert store.get_chunk("other.pdf:1:0") is not None

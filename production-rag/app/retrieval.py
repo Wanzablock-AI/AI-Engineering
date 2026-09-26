@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+
+from app.chunking import Chunk
 from pathlib import Path
 import re
 import sqlite3
@@ -75,6 +77,49 @@ class LexicalRetriever:
             f'"{term.replace(chr(34), chr(34) * 2)}"'
             for term in terms
         )
+
+    def add_chunks(self, chunks: list[Chunk]) -> None:
+        if not chunks:
+            return
+
+        with self._connect() as connection:
+            connection.executemany(
+                """
+                INSERT OR REPLACE INTO chunks_fts (
+                    chunk_id,
+                    document,
+                    page_number,
+                    text
+                )
+                VALUES (?, ?, ?, ?)
+                """,
+                [
+                    (
+                        chunk.chunk_id,
+                        chunk.document,
+                        chunk.page_number,
+                        chunk.text,
+                    )
+                    for chunk in chunks
+                ],
+            )
+
+            connection.commit()
+
+    def delete_document(self, document: str) -> None:
+        if not document.strip():
+            raise ValueError("document cannot be empty")
+
+        with self._connect() as connection:
+            connection.execute(
+                """
+                DELETE FROM chunks_fts
+                WHERE document = ?
+                """,
+                (document,),
+            )
+
+            connection.commit()
 
     def search(
         self,

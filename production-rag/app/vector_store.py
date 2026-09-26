@@ -75,6 +75,23 @@ class VectorStore:
 
             connection.commit()
 
+    def delete_document(self, document: str) -> None:
+        if not document.strip():
+            raise ValueError("document cannot be empty")
+
+        prefix = f"{document}:%"
+
+        with self._connect() as connection:
+            connection.execute(
+                """
+                DELETE FROM embeddings
+                WHERE chunk_id LIKE ?
+                """,
+                (prefix,),
+            )
+
+            connection.commit()
+
     def get_embedding(
         self,
         chunk_id: str,
