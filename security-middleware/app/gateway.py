@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from app.audit import AuditLogger
 from app.security import SecurityMiddleware
 
 
@@ -12,12 +13,14 @@ class GatewayResult:
 
 
 class SecurityGateway:
-    def __init__(self, provider, security=None):
+    def __init__(self, provider, security=None, audit=None):
         self.provider = provider
         self.security = security or SecurityMiddleware()
+        self.audit = audit or AuditLogger()
 
     def handle(self, request: str) -> GatewayResult:
         decision = self.security.check(request)
+        self.audit.record(decision)
 
         if not decision.allowed:
             return GatewayResult(
