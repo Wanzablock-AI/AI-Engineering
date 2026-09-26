@@ -4,3 +4,4 @@ pymupdf
 pydantic
 pytest
 sentence-transformers
+langgraph
