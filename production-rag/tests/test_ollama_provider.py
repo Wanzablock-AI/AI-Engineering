@@ -125,3 +125,30 @@ def test_provider_handles_missing_response(monkeypatch):
             "What does it say?",
             build_context(),
         )
+
+
+def test_provider_uses_local_ollama_default(monkeypatch):
+    monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
+
+    provider = OllamaAnswerProvider()
+
+    assert provider.base_url == "http://localhost:11434"
+
+
+def test_provider_reads_ollama_base_url_from_environment(monkeypatch):
+    monkeypatch.setenv(
+        "OLLAMA_BASE_URL",
+        "http://ollama.internal:11434",
+    )
+
+    provider = OllamaAnswerProvider()
+
+    assert provider.base_url == "http://ollama.internal:11434"
+
+
+def test_provider_reads_ollama_model_from_environment(monkeypatch):
+    monkeypatch.setenv("OLLAMA_MODEL", "test-model")
+
+    provider = OllamaAnswerProvider()
+
+    assert provider.model == "test-model"

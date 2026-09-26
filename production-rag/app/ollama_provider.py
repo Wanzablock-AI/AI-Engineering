@@ -17,7 +17,7 @@ class OllamaAnswerProvider:
     ):
         self.base_url = (
             base_url
-            or os.getenv("OLLAMA_BASE_URL", "http://100.118.104.245:11434")
+            or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
         ).rstrip("/")
         self.model = model or os.getenv("OLLAMA_MODEL", "granite4.1:3b")
         self.timeout = timeout
