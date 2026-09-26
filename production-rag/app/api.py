@@ -100,23 +100,6 @@ def create_app(
                 detail="Only PDF files are supported",
             )
 
-        if document_ingestor is None:
-            embedding_provider = SentenceTransformerEmbeddingProvider()
-
-            vector_store = VectorStore(
-                DEFAULT_DB_PATH,
-                dimensions=embedding_provider.dimensions,
-            )
-
-            lexical_retriever = LexicalRetriever(DEFAULT_DB_PATH)
-
-            document_ingestor = DocumentIngestor(
-                chunk_store=ChunkStore(DEFAULT_DB_PATH),
-                vector_store=vector_store,
-                embedding_provider=embedding_provider,
-                lexical_retriever=lexical_retriever,
-            )
-
         safe_filename = Path(file.filename).name
 
         if not safe_filename:
@@ -153,6 +136,23 @@ def create_app(
                         status_code=400,
                         detail="Uploaded file is not a valid PDF",
                     )
+
+            if document_ingestor is None:
+                embedding_provider = SentenceTransformerEmbeddingProvider()
+
+                vector_store = VectorStore(
+                    DEFAULT_DB_PATH,
+                    dimensions=embedding_provider.dimensions,
+                )
+
+                lexical_retriever = LexicalRetriever(DEFAULT_DB_PATH)
+
+                document_ingestor = DocumentIngestor(
+                    chunk_store=ChunkStore(DEFAULT_DB_PATH),
+                    vector_store=vector_store,
+                    embedding_provider=embedding_provider,
+                    lexical_retriever=lexical_retriever,
+                )
 
             result: IngestionResult = document_ingestor.ingest(
                 temporary_path

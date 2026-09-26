@@ -197,3 +197,41 @@ def test_ingest_rejects_oversized_pdf():
     }
 
     assert ingestor.received_path is None
+
+
+def test_ingest_rejects_invalid_pdf_without_initializing_embedding_model(
+    monkeypatch,
+):
+    initialized = False
+
+    class FailingEmbeddingProvider:
+        def __init__(self):
+            nonlocal initialized
+            initialized = True
+            raise AssertionError(
+                "embedding model should not initialize for rejected upload"
+            )
+
+    monkeypatch.setattr(
+        "app.api.SentenceTransformerEmbeddingProvider",
+        FailingEmbeddingProvider,
+    )
+
+    client = TestClient(create_app(FakeGraph()))
+
+    response = client.post(
+        "/ingest",
+        files={
+            "file": (
+                "security.pdf",
+                b"not a PDF",
+                "application/pdf",
+            )
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "Uploaded file is not a valid PDF"
+    }
+    assert initialized is False
