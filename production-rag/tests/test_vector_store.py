@@ -173,3 +173,32 @@ def test_vector_store_deletes_document(tmp_path):
     assert store.get_embedding("security.pdf:1:0") is None
     assert store.get_embedding("security.pdf:2:0") is None
     assert store.get_embedding("other.pdf:1:0") == [0.5, 0.5]
+
+
+def test_vector_store_rejects_nan_values(tmp_path):
+    store = VectorStore(tmp_path / "test.db", dimensions=2)
+
+    try:
+        store.add_embedding(
+            "nan-vector",
+            [float("nan"), 1.0],
+        )
+    except ValueError as exc:
+        assert "finite" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError")
+
+
+def test_vector_store_rejects_infinite_values(tmp_path):
+    store = VectorStore(tmp_path / "test.db", dimensions=2)
+
+    for value in [float("inf"), float("-inf")]:
+        try:
+            store.add_embedding(
+                "infinite-vector",
+                [value, 1.0],
+            )
+        except ValueError as exc:
+            assert "finite" in str(exc)
+        else:
+            raise AssertionError("Expected ValueError")

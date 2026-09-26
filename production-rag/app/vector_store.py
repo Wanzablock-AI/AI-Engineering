@@ -58,6 +58,11 @@ class VectorStore:
                 f"Expected vector with {self.dimensions} dimensions"
             )
 
+        if not all(math.isfinite(value) for value in vector):
+            raise ValueError(
+                "vector values must be finite"
+            )
+
         with self._connect() as connection:
             connection.execute(
                 """
