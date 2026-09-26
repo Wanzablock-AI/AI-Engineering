@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Protocol
 
+from sentence_transformers import SentenceTransformer
+
 
 @dataclass(frozen=True)
 class Embedding:
@@ -37,3 +39,29 @@ class DeterministicEmbeddingProvider:
             return values
 
         return [value / magnitude for value in values]
+
+
+class SentenceTransformerEmbeddingProvider:
+    """Semantic embeddings using a local Sentence Transformers model."""
+
+    def __init__(
+        self,
+        model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
+    ):
+        self.model = SentenceTransformer(model_name)
+
+        self.dimensions = self.model.get_embedding_dimension()
+
+        if self.dimensions is None:
+            raise ValueError("Unable to determine embedding dimensions")
+
+    def embed(self, text: str) -> list[float]:
+        if not text.strip():
+            raise ValueError("text cannot be empty")
+
+        vector = self.model.encode(
+            text,
+            normalize_embeddings=True,
+        )
+
+        return [float(value) for value in vector]
