@@ -140,3 +140,60 @@ def test_ingest_rejects_non_pdf():
     assert response.json() == {
         "detail": "Only PDF files are supported"
     }
+
+
+def test_query_rejects_oversized_query():
+    client = TestClient(create_app(FakeGraph()))
+
+    response = client.post(
+        "/query",
+        json={"query": "x" * 4001},
+    )
+
+    assert response.status_code == 422
+
+
+def test_ingest_rejects_non_pdf_content():
+    ingestor = FakeIngestor()
+    client = TestClient(create_app(FakeGraph(), ingestor))
+
+    response = client.post(
+        "/ingest",
+        files={
+            "file": (
+                "security.pdf",
+                b"this is not a PDF",
+                "application/pdf",
+            )
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "Uploaded file is not a valid PDF"
+    }
+
+
+def test_ingest_rejects_oversized_pdf():
+    ingestor = FakeIngestor()
+    client = TestClient(create_app(FakeGraph(), ingestor))
+
+    oversized_pdf = b"%PDF-" + b"x" * (10 * 1024 * 1024)
+
+    response = client.post(
+        "/ingest",
+        files={
+            "file": (
+                "security.pdf",
+                oversized_pdf,
+                "application/pdf",
+            )
+        },
+    )
+
+    assert response.status_code == 413
+    assert response.json() == {
+        "detail": "PDF upload exceeds the 10 MiB limit"
+    }
+
+    assert ingestor.received_path is None

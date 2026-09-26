@@ -1,4 +1,3 @@
-import shutil
 import tempfile
 from pathlib import Path
 
@@ -15,8 +14,13 @@ from app.storage import ChunkStore, DEFAULT_DB_PATH
 from app.vector_store import VectorStore
 
 
+MAX_QUERY_LENGTH = 4_000
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024
+UPLOAD_CHUNK_SIZE = 1024 * 1024
+
+
 class QueryRequest(BaseModel):
-    query: str = Field(min_length=1)
+    query: str = Field(min_length=1, max_length=MAX_QUERY_LENGTH)
 
     @field_validator("query")
     @classmethod
@@ -115,11 +119,40 @@ def create_app(
 
         safe_filename = Path(file.filename).name
 
+        if not safe_filename:
+            raise HTTPException(
+                status_code=400,
+                detail="A valid PDF filename is required",
+            )
+
         with tempfile.TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory) / safe_filename
 
+            total_size = 0
+
             with temporary_path.open("wb") as temporary_file:
-                shutil.copyfileobj(file.file, temporary_file)
+                while True:
+                    chunk = file.file.read(UPLOAD_CHUNK_SIZE)
+
+                    if not chunk:
+                        break
+
+                    total_size += len(chunk)
+
+                    if total_size > MAX_UPLOAD_SIZE:
+                        raise HTTPException(
+                            status_code=413,
+                            detail="PDF upload exceeds the 10 MiB limit",
+                        )
+
+                    temporary_file.write(chunk)
+
+            with temporary_path.open("rb") as uploaded_file:
+                if uploaded_file.read(5) != b"%PDF-":
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Uploaded file is not a valid PDF",
+                    )
 
             result: IngestionResult = document_ingestor.ingest(
                 temporary_path
