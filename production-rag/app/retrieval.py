@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
+import re
 import sqlite3
 
 
@@ -66,6 +67,15 @@ class LexicalRetriever:
 
             connection.commit()
 
+    @staticmethod
+    def _build_fts_query(query: str) -> str:
+        terms = re.findall(r"\w+", query, flags=re.UNICODE)
+
+        return " OR ".join(
+            f'"{term.replace(chr(34), chr(34) * 2)}"'
+            for term in terms
+        )
+
     def search(
         self,
         query: str,
@@ -76,6 +86,11 @@ class LexicalRetriever:
 
         if limit <= 0:
             raise ValueError("limit must be greater than zero")
+
+        fts_query = self._build_fts_query(query)
+
+        if not fts_query:
+            return []
 
         with self._connect() as connection:
             rows = connection.execute(
@@ -91,7 +106,7 @@ class LexicalRetriever:
                 ORDER BY score
                 LIMIT ?
                 """,
-                (query, limit),
+                (fts_query, limit),
             ).fetchall()
 
         return [

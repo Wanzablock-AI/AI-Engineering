@@ -68,3 +68,27 @@ def test_lexical_retrieval_rejects_invalid_limit(tmp_path):
         pass
     else:
         raise AssertionError("Expected ValueError")
+
+
+def test_lexical_retrieval_handles_natural_language_punctuation(tmp_path):
+    db_path = tmp_path / "test.db"
+
+    store = ChunkStore(db_path)
+
+    store.add_chunks(
+        [
+            Chunk(
+                chunk_id="security.pdf:1:0",
+                document="security.pdf",
+                page_number=1,
+                text="Input validation checks incoming data before processing.",
+            ),
+        ]
+    )
+
+    retriever = LexicalRetriever(db_path)
+
+    results = retriever.search("What does input validation do?")
+
+    assert len(results) == 1
+    assert results[0].chunk_id == "security.pdf:1:0"
