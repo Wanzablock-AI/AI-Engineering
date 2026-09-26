@@ -1,6 +1,14 @@
 import json
+import math
 import sqlite3
+from dataclasses import dataclass
 from pathlib import Path
+
+
+@dataclass(frozen=True)
+class VectorSearchResult:
+    chunk_id: str
+    score: float
 
 
 class VectorStore:
@@ -93,6 +101,80 @@ class VectorStore:
             )
 
         return [float(value) for value in vector]
+
+    def search(
+        self,
+        query_vector: list[float],
+        limit: int = 5,
+    ) -> list[VectorSearchResult]:
+        if len(query_vector) != self.dimensions:
+            raise ValueError(
+                f"Expected query vector with {self.dimensions} dimensions"
+            )
+
+        if limit <= 0:
+            raise ValueError("limit must be greater than zero")
+
+        query_magnitude = math.sqrt(
+            sum(value * value for value in query_vector)
+        )
+
+        if query_magnitude == 0:
+            raise ValueError("query vector cannot be zero")
+
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT chunk_id, vector
+                FROM embeddings
+                """
+            ).fetchall()
+
+        results: list[VectorSearchResult] = []
+
+        for row in rows:
+            vector = json.loads(row["vector"])
+
+            if len(vector) != self.dimensions:
+                raise ValueError(
+                    f"Stored vector has {len(vector)} dimensions, "
+                    f"expected {self.dimensions}"
+                )
+
+            vector = [float(value) for value in vector]
+
+            magnitude = math.sqrt(
+                sum(value * value for value in vector)
+            )
+
+            if magnitude == 0:
+                continue
+
+            dot_product = sum(
+                query_value * vector_value
+                for query_value, vector_value in zip(
+                    query_vector,
+                    vector,
+                )
+            )
+
+            score = dot_product / (
+                query_magnitude * magnitude
+            )
+
+            results.append(
+                VectorSearchResult(
+                    chunk_id=row["chunk_id"],
+                    score=score,
+                )
+            )
+
+        results.sort(
+            key=lambda result: result.score,
+            reverse=True,
+        )
+
+        return results[:limit]
 
     def count(self) -> int:
         with self._connect() as connection:
