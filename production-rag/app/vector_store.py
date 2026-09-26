@@ -84,13 +84,19 @@ class VectorStore:
         if not document.strip():
             raise ValueError("document cannot be empty")
 
-        prefix = f"{document}:%"
+        escaped_document = (
+            document
+            .replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+        )
+        prefix = f"{escaped_document}:%"
 
         with self._connect() as connection:
             connection.execute(
                 """
                 DELETE FROM embeddings
-                WHERE chunk_id LIKE ?
+                WHERE chunk_id LIKE ? ESCAPE '\\'
                 """,
                 (prefix,),
             )

@@ -202,3 +202,29 @@ def test_vector_store_rejects_infinite_values(tmp_path):
             assert "finite" in str(exc)
         else:
             raise AssertionError("Expected ValueError")
+
+
+def test_vector_store_delete_document_escapes_like_wildcards(tmp_path):
+    store = VectorStore(tmp_path / "test.db", dimensions=2)
+
+    store.add_embedding(
+        "reportX2026.pdf:1:0",
+        [1.0, 0.0],
+    )
+
+    store.add_embedding(
+        "report_2026.pdf:1:0",
+        [0.0, 1.0],
+    )
+
+    store.add_embedding(
+        "report%2026.pdf:1:0",
+        [0.5, 0.5],
+    )
+
+    store.delete_document("report_2026.pdf")
+
+    assert store.get_embedding("report_2026.pdf:1:0") is None
+    assert store.get_embedding("reportX2026.pdf:1:0") == [1.0, 0.0]
+    assert store.get_embedding("report%2026.pdf:1:0") == [0.5, 0.5]
+    assert store.count() == 2
