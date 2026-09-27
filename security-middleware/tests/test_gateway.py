@@ -108,3 +108,31 @@ def test_gateway_can_use_model_router_adapter():
     assert result.allowed is True
     assert result.answer == "router-generated"
     assert router.calls == ["Write Python code"]
+
+
+class ExplicitModelProvider:
+    def __init__(self):
+        self.calls = []
+
+    def generate(self, request, model=None):
+        self.calls.append((request, model))
+        return "explicit-model-answer"
+
+
+def test_gateway_forwards_explicit_model():
+    provider = ExplicitModelProvider()
+    gateway = SecurityGateway(provider)
+
+    result = gateway.handle(
+        "Explain distributed systems",
+        model="granite4.1:3b",
+    )
+
+    assert result.allowed is True
+    assert result.answer == "explicit-model-answer"
+    assert provider.calls == [
+        (
+            "Explain distributed systems",
+            "granite4.1:3b",
+        )
+    ]

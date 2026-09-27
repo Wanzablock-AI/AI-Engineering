@@ -18,7 +18,11 @@ class SecurityGateway:
         self.security = security or SecurityMiddleware()
         self.audit = audit or AuditLogger()
 
-    def handle(self, request: str) -> GatewayResult:
+    def handle(
+        self,
+        request: str,
+        model: str | None = None,
+    ) -> GatewayResult:
         decision = self.security.check(request)
         self.audit.record(decision)
 
@@ -30,7 +34,13 @@ class SecurityGateway:
                 answer=None,
             )
 
-        answer = self.provider.generate(request)
+        if model is None:
+            answer = self.provider.generate(request)
+        else:
+            answer = self.provider.generate(
+                request,
+                model=model,
+            )
 
         return GatewayResult(
             allowed=True,

@@ -55,3 +55,39 @@ def test_model_router_client_raises_for_http_error():
         assert exc.response.status_code == 502
     else:
         raise AssertionError("Expected HTTPStatusError")
+
+
+def test_model_router_client_preserves_explicit_model():
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(
+            200,
+            json={
+                "model": "granite4.1:3b",
+                "answer": "explicit-model-answer",
+            },
+        )
+
+    client = httpx.Client(
+        transport=httpx.MockTransport(handler)
+    )
+
+    router = ModelRouterClient(
+        base_url="http://model-router:8000",
+        client=client,
+    )
+
+    answer = router.generate(
+        "Explain distributed systems",
+        model="granite4.1:3b",
+    )
+
+    assert answer == "explicit-model-answer"
+    import json
+
+    assert json.loads(requests[0].content) == {
+        "request": "Explain distributed systems",
+        "model": "granite4.1:3b",
+    }

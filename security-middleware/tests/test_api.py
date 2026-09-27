@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.api import app
+from app.api import app, gateway
 
 
 client = TestClient(app)
@@ -117,3 +117,39 @@ def test_generate_blocks_injection_without_provider_call():
     assert payload["risk_level"] == "high"
     assert payload["reason"] == "prompt_injection"
     assert payload["answer"] is None
+
+
+def test_generate_forwards_explicit_model():
+    class RecordingProvider:
+        def __init__(self):
+            self.calls = []
+
+        def generate(self, request, model=None):
+            self.calls.append((request, model))
+            return "explicit-model-answer"
+
+    provider = RecordingProvider()
+    original_provider = gateway.provider
+    gateway.provider = provider
+
+    try:
+        response = client.post(
+            "/generate",
+            json={
+                "request": "Explain distributed systems",
+                "model": "granite4.1:3b",
+            },
+        )
+    finally:
+        gateway.provider = original_provider
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["allowed"] is True
+    assert payload["answer"] == "explicit-model-answer"
+    assert provider.calls == [
+        (
+            "Explain distributed systems",
+            "granite4.1:3b",
+        )
+    ]

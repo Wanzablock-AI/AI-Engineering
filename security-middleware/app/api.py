@@ -24,6 +24,7 @@ gateway = SecurityGateway(
 
 class SecurityRequest(BaseModel):
     request: str
+    model: str | None = None
 
 
 @app.get("/health")
@@ -44,7 +45,10 @@ def check(request: SecurityRequest):
 
 @app.post("/generate")
 def generate(request: SecurityRequest):
-    result = gateway.handle(request.request)
+    result = gateway.handle(
+        request.request,
+        model=request.model,
+    )
 
     return {
         "allowed": result.allowed,

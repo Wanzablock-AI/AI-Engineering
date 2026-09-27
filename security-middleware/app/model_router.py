@@ -6,10 +6,15 @@ class ModelRouterClient:
         self.base_url = base_url.rstrip("/")
         self.client = client or httpx.Client(timeout=120.0)
 
-    def generate(self, request: str) -> str:
+    def generate(self, request: str, model: str | None = None) -> str:
+        payload = {"request": request}
+
+        if model and model != "auto":
+            payload["model"] = model
+
         response = self.client.post(
             f"{self.base_url}/generate",
-            json={"request": request},
+            json=payload,
         )
         response.raise_for_status()
 
