@@ -5,14 +5,17 @@ services:
       dockerfile: Dockerfile
     image: production-rag:dev
     container_name: production-rag
+    user: appuser
+    working_dir: /app
     ports:
       - "8000:8000"
     environment:
       RAG_DB_PATH: /app/data/production-rag.db
-      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      OLLAMA_BASE_URL: http://100.118.104.245:11434
       OLLAMA_MODEL: granite4.1:3b
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
+      - ${HOME}/.cache/huggingface:/home/appuser/.cache/huggingface:ro
       - ./data:/app/data
     restart: unless-stopped

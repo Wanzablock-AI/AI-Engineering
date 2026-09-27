@@ -44,8 +44,13 @@ class CrossEncoderReranker:
 class HybridReranker:
     """Reranks hybrid-retrieval candidates with a supplied scorer."""
 
-    def __init__(self, reranker: Reranker):
+    def __init__(
+        self,
+        reranker: Reranker,
+        min_score: float | None = None,
+    ):
         self.reranker = reranker
+        self.min_score = min_score
 
     def rerank(
         self,
@@ -81,5 +86,12 @@ class HybridReranker:
             key=lambda result: result.score,
             reverse=True,
         )
+
+        if self.min_score is not None:
+            scored = [
+                result
+                for result in scored
+                if result.score >= self.min_score
+            ]
 
         return scored[:limit]

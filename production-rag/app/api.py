@@ -71,7 +71,13 @@ def create_app(
         if rag_graph is None:
             rag_graph = build_rag_graph()
 
-        result: GroundedAnswer = rag_graph.invoke(request.query)
+        try:
+            result: GroundedAnswer = rag_graph.invoke(request.query)
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=str(exc),
+            ) from exc
 
         return QueryResponse(
             answer=result.answer,
@@ -140,6 +146,8 @@ def create_app(
             if document_ingestor is None:
                 embedding_provider = SentenceTransformerEmbeddingProvider()
 
+                chunk_store = ChunkStore(DEFAULT_DB_PATH)
+
                 vector_store = VectorStore(
                     DEFAULT_DB_PATH,
                     dimensions=embedding_provider.dimensions,
@@ -148,7 +156,7 @@ def create_app(
                 lexical_retriever = LexicalRetriever(DEFAULT_DB_PATH)
 
                 document_ingestor = DocumentIngestor(
-                    chunk_store=ChunkStore(DEFAULT_DB_PATH),
+                    chunk_store=chunk_store,
                     vector_store=vector_store,
                     embedding_provider=embedding_provider,
                     lexical_retriever=lexical_retriever,

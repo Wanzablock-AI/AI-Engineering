@@ -34,7 +34,8 @@ def build_rag_graph(
     )
 
     reranker = HybridReranker(
-        CrossEncoderReranker()
+        CrossEncoderReranker(),
+        min_score=None,
     )
 
     provider = OllamaAnswerProvider()
