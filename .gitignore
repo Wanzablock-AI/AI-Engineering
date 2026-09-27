@@ -58,3 +58,4 @@ ollama-cache/
 tmp/
 temp/
 *.tmp
+production-rag/data/
