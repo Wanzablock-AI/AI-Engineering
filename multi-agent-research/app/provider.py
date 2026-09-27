@@ -14,7 +14,7 @@ class OllamaResearchProvider:
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout = timeout
-        self.client = client or httpx.Client(timeout=timeout)
+        self.client = client
 
     def research(self, question: str) -> str:
         if not isinstance(question, str):
@@ -23,14 +23,23 @@ class OllamaResearchProvider:
         if not question.strip():
             raise ValueError("Question cannot be empty")
 
-        response = self.client.post(
-            f"{self.base_url}/api/generate",
-            json={
-                "model": self.model,
-                "prompt": question,
-                "stream": False,
-            },
-        )
+        payload = {
+            "model": self.model,
+            "prompt": question,
+            "stream": False,
+        }
+
+        if self.client is not None:
+            response = self.client.post(
+                f"{self.base_url}/api/generate",
+                json=payload,
+            )
+        else:
+            response = httpx.post(
+                f"{self.base_url}/api/generate",
+                json=payload,
+                timeout=self.timeout,
+            )
 
         response.raise_for_status()
 
@@ -55,7 +64,7 @@ class OllamaSynthesisProvider:
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout = timeout
-        self.client = client or httpx.Client(timeout=timeout)
+        self.client = client
 
     def synthesize(
         self,
@@ -90,14 +99,23 @@ class OllamaSynthesisProvider:
             f"Research results:\n{research_text}"
         )
 
-        response = self.client.post(
-            f"{self.base_url}/api/generate",
-            json={
-                "model": self.model,
-                "prompt": prompt,
-                "stream": False,
-            },
-        )
+        payload = {
+            "model": self.model,
+            "prompt": prompt,
+            "stream": False,
+        }
+
+        if self.client is not None:
+            response = self.client.post(
+                f"{self.base_url}/api/generate",
+                json=payload,
+            )
+        else:
+            response = httpx.post(
+                f"{self.base_url}/api/generate",
+                json=payload,
+                timeout=self.timeout,
+            )
 
         response.raise_for_status()
 
