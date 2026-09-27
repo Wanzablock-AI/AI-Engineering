@@ -24,7 +24,7 @@ def test_generate_full_gateway_pipeline(monkeypatch):
         answer = "Integrated model answer."
 
     class RouterAdapter:
-        def generate(self, request):
+        def generate(self, request, model=None):
             calls.append(("router", request))
             return RouterResult()
 
@@ -116,7 +116,7 @@ def test_generate_security_failure_stops_pipeline(monkeypatch):
             return SecurityResult()
 
     class FailingRouter:
-        def generate(self, request):
+        def generate(self, request, model=None):
             calls.append(("router", request))
             raise AssertionError("router must not run")
 

@@ -14,10 +14,13 @@ class ModelRouterAdapter:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
 
-    def generate(self, request: str) -> ModelRouterResult:
+    def generate(self, request: str, model: str | None = None) -> ModelRouterResult:
         response = httpx.post(
             f"{self.base_url}/generate",
-            json={"request": request},
+            json={
+                "request": request,
+                **({"model": model} if model and model != "auto" else {}),
+            },
             timeout=self.timeout,
         )
         response.raise_for_status()

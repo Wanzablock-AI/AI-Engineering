@@ -75,7 +75,10 @@ def generate(payload: GenerateRequest, response: Response, request: Request):
     import time
 
     started = time.perf_counter()
-    result = model_router_adapter.generate(payload.request)
+    result = model_router_adapter.generate(
+        payload.request,
+        model=payload.model,
+    )
     latency_ms = (time.perf_counter() - started) * 1000
 
     evaluation_adapter.evaluate(

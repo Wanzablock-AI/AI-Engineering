@@ -18,7 +18,7 @@ class FakeModelRouterResult:
 
 
 class FakeModelRouterAdapter:
-    def generate(self, request):
+    def generate(self, request, model=None):
         return FakeModelRouterResult()
 
 
