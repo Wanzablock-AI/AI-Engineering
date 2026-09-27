@@ -1,0 +1,80 @@
+services:
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ai-platform:dev
+    container_name: ai-platform-gateway
+    ports:
+      - "8005:8000"
+    depends_on:
+      security-middleware:
+        condition: service_healthy
+      model-router:
+        condition: service_healthy
+      eval-observability:
+        condition: service_healthy
+      production-rag:
+        condition: service_started
+      multi-agent-research:
+        condition: service_started
+    restart: unless-stopped
+
+  security-middleware:
+    build:
+      context: ../security-middleware
+      dockerfile: Dockerfile
+    image: security-middleware:dev
+    container_name: ai-platform-security
+    environment:
+      MODEL_ROUTER_BASE_URL: http://model-router:8000
+    restart: unless-stopped
+
+  model-router:
+    build:
+      context: ../model-router
+      dockerfile: Dockerfile
+    image: model-router:dev
+    container_name: ai-platform-model-router
+    environment:
+      OLLAMA_BASE_URL: http://100.118.104.245:11434
+    restart: unless-stopped
+
+  eval-observability:
+    build:
+      context: ../eval-observability
+      dockerfile: Dockerfile
+    image: eval-observability:dev
+    container_name: ai-platform-eval
+    environment:
+      EVAL_DB_PATH: /app/data/eval-observability.db
+    volumes:
+      - ../eval-observability/data:/app/data
+    restart: unless-stopped
+
+  production-rag:
+    build:
+      context: ../production-rag
+      dockerfile: Dockerfile
+    image: production-rag:dev
+    container_name: ai-platform-rag
+    environment:
+      RAG_DB_PATH: /app/data/production-rag.db
+      OLLAMA_BASE_URL: http://100.118.104.245:11434
+      OLLAMA_MODEL: granite4.1:3b
+    volumes:
+      - ../production-rag/data:/app/data
+    restart: unless-stopped
+
+  multi-agent-research:
+    build:
+      context: ../multi-agent-research
+      dockerfile: Dockerfile
+    image: multi-agent-research:dev
+    container_name: ai-platform-research
+    environment:
+      OLLAMA_BASE_URL: http://100.118.104.245:11434
+      OLLAMA_MODEL: granite4.1:3b
+      OLLAMA_TIMEOUT: "300"
+    restart: unless-stopped
