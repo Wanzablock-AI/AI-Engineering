@@ -9,12 +9,14 @@ from app.contracts import (
     RAGCitationResponse,
     ResearchRequest,
     ResearchResponse,
+    ResearchResultResponse,
 )
 from app.request_id import generate_request_id
 from app.security_adapter import SecurityAdapter
 from app.model_router_adapter import ModelRouterAdapter
 from app.evaluation_adapter import EvaluationAdapter
 from app.rag_adapter import RAGAdapter
+from app.research_adapter import ResearchAdapter
 
 
 app = FastAPI(title="AI Engineering Platform")
@@ -23,6 +25,7 @@ security_adapter = SecurityAdapter("http://security-middleware:8000")
 model_router_adapter = ModelRouterAdapter("http://model-router:8000")
 evaluation_adapter = EvaluationAdapter("http://eval-observability:8000")
 rag_adapter = RAGAdapter("http://production-rag:8000")
+research_adapter = ResearchAdapter("http://multi-agent-research:8000")
 
 
 @app.get("/health")
@@ -110,9 +113,36 @@ def rag_query(payload: RAGRequest, response: Response):
 def research(payload: ResearchRequest, response: Response):
     request_id = generate_request_id()
     response.headers["X-Request-ID"] = request_id
+
+    security = security_adapter.check(payload.request)
+
+    if not security.allowed:
+        return JSONResponse(
+            status_code=403,
+            content={
+                "detail": {
+                    "code": "SECURITY_BLOCKED",
+                    "reason": security.reason,
+                }
+            },
+        )
+
+    result = research_adapter.research(
+        request=payload.request,
+        questions=payload.questions,
+    )
+
     return ResearchResponse(
         request_id=request_id,
-        request=payload.request,
-        synthesis="Gateway research placeholder.",
-        results=[],
+        request=result.request,
+        synthesis=result.synthesis,
+        results=[
+            ResearchResultResponse(
+                task_id=item.task_id,
+                question=item.question,
+                answer=item.answer,
+                success=item.success,
+            )
+            for item in result.results
+        ],
     )

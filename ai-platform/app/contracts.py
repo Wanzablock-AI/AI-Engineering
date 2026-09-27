@@ -36,11 +36,18 @@ class GenerateResponse(BaseModel):
     latency_ms: float = Field(ge=0)
 
 
+class ResearchResultResponse(BaseModel):
+    task_id: str
+    question: str
+    answer: str
+    success: bool
+
+
 class ResearchResponse(BaseModel):
     request_id: str = Field(min_length=1)
     request: str
     synthesis: str
-    results: list
+    results: list[ResearchResultResponse]
 
 
 class ErrorResponse(BaseModel):

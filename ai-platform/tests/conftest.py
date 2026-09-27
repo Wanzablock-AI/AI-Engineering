@@ -78,3 +78,29 @@ def mock_rag_adapter(monkeypatch):
         "app.gateway.rag_adapter",
         FakeRAGAdapter(),
     )
+
+
+class FakeResearchResult:
+    task_id = "task-1"
+    question = "What is RAG?"
+    answer = "RAG retrieves relevant context before generation."
+    success = True
+
+
+class FakeResearchReport:
+    request = "Explain RAG."
+    results = [FakeResearchResult()]
+    synthesis = "RAG combines retrieval with generation."
+
+
+class FakeResearchAdapter:
+    def research(self, request, questions):
+        return FakeResearchReport()
+
+
+@pytest.fixture(autouse=True)
+def mock_research_adapter(monkeypatch):
+    monkeypatch.setattr(
+        "app.gateway.research_adapter",
+        FakeResearchAdapter(),
+    )
