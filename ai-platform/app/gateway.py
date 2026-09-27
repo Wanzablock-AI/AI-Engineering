@@ -1,4 +1,6 @@
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Request, Response
+from fastapi.exceptions import RequestValidationError
+from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 
 from app.contracts import (
@@ -12,6 +14,13 @@ from app.contracts import (
     ResearchResultResponse,
 )
 from app.request_id import generate_request_id
+from app.errors import (
+    REQUEST_ID_HEADER,
+    get_request_id,
+    validation_exception_handler,
+    http_exception_handler,
+    unhandled_exception_handler,
+)
 from app.security_adapter import SecurityAdapter
 from app.model_router_adapter import ModelRouterAdapter
 from app.evaluation_adapter import EvaluationAdapter
@@ -20,6 +29,19 @@ from app.research_adapter import ResearchAdapter
 
 
 app = FastAPI(title="AI Engineering Platform")
+
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(Exception, unhandled_exception_handler)
+
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    request_id = request.headers.get(REQUEST_ID_HEADER) or generate_request_id()
+    request.state.request_id = request_id
+
+    response = await call_next(request)
+    response.headers[REQUEST_ID_HEADER] = request_id
+    return response
 
 security_adapter = SecurityAdapter("http://security-middleware:8000")
 model_router_adapter = ModelRouterAdapter("http://model-router:8000")
@@ -34,9 +56,8 @@ def health():
 
 
 @app.post("/v1/generate", response_model=GenerateResponse)
-def generate(payload: GenerateRequest, response: Response):
-    request_id = generate_request_id()
-    response.headers["X-Request-ID"] = request_id
+def generate(payload: GenerateRequest, response: Response, request: Request):
+    request_id = get_request_id(request)
 
     security = security_adapter.check(payload.request)
 
@@ -44,11 +65,11 @@ def generate(payload: GenerateRequest, response: Response):
         return JSONResponse(
             status_code=403,
             content={
-                "detail": {
-                    "code": "SECURITY_BLOCKED",
-                    "reason": security.reason,
-                }
+                "code": "SECURITY_BLOCKED",
+                "message": security.reason,
+                "request_id": request_id,
             },
+            headers={"X-Request-ID": request_id},
         )
 
     import time
@@ -76,9 +97,8 @@ def generate(payload: GenerateRequest, response: Response):
 
 
 @app.post("/v1/rag/query", response_model=RAGResponse)
-def rag_query(payload: RAGRequest, response: Response):
-    request_id = generate_request_id()
-    response.headers["X-Request-ID"] = request_id
+def rag_query(payload: RAGRequest, response: Response, request: Request):
+    request_id = get_request_id(request)
 
     security = security_adapter.check(payload.request)
 
@@ -86,11 +106,11 @@ def rag_query(payload: RAGRequest, response: Response):
         return JSONResponse(
             status_code=403,
             content={
-                "detail": {
-                    "code": "SECURITY_BLOCKED",
-                    "reason": security.reason,
-                }
+                "code": "SECURITY_BLOCKED",
+                "message": security.reason,
+                "request_id": request_id,
             },
+            headers={"X-Request-ID": request_id},
         )
 
     result = rag_adapter.query(payload.request)
@@ -110,9 +130,8 @@ def rag_query(payload: RAGRequest, response: Response):
 
 
 @app.post("/v1/research", response_model=ResearchResponse)
-def research(payload: ResearchRequest, response: Response):
-    request_id = generate_request_id()
-    response.headers["X-Request-ID"] = request_id
+def research(payload: ResearchRequest, response: Response, request: Request):
+    request_id = get_request_id(request)
 
     security = security_adapter.check(payload.request)
 
@@ -120,11 +139,11 @@ def research(payload: ResearchRequest, response: Response):
         return JSONResponse(
             status_code=403,
             content={
-                "detail": {
-                    "code": "SECURITY_BLOCKED",
-                    "reason": security.reason,
-                }
+                "code": "SECURITY_BLOCKED",
+                "message": security.reason,
+                "request_id": request_id,
             },
+            headers={"X-Request-ID": request_id},
         )
 
     result = research_adapter.research(

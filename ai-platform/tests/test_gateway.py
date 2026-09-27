@@ -100,8 +100,10 @@ def test_generate_blocks_security_failure(monkeypatch):
 
     assert response.status_code == 403
     payload = response.json()
-    assert payload["detail"]["code"] == "SECURITY_BLOCKED"
-    assert payload["detail"]["reason"] == "prompt_injection"
+    assert payload["code"] == "SECURITY_BLOCKED"
+    assert payload["message"] == "prompt_injection"
+    assert payload["request_id"]
+    assert response.headers["X-Request-ID"] == payload["request_id"]
 
 
 def test_generate_uses_model_router_after_security(monkeypatch):
@@ -240,5 +242,7 @@ def test_rag_query_blocks_security_failure(monkeypatch):
 
     payload = response.json()
 
-    assert payload["detail"]["code"] == "SECURITY_BLOCKED"
-    assert payload["detail"]["reason"] == "prompt_injection"
+    assert payload["code"] == "SECURITY_BLOCKED"
+    assert payload["message"] == "prompt_injection"
+    assert payload["request_id"]
+    assert response.headers["X-Request-ID"] == payload["request_id"]
